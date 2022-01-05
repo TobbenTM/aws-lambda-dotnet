@@ -1,6 +1,6 @@
 param ([Parameter(Mandatory)]$Dockerfile)
 
-# Updates the Dockerfile with next ASP.NET Core version and checksum256 hash if available
+# Updates the Dockerfile with next ASP.NET Core version and checksum512 hash if available
 function Update-Dockerfile ([string]$path) {
     Write-Host "Updating $path with next ASP.NET Core version"
 
