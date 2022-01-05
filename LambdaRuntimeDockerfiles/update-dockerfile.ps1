@@ -1,10 +1,10 @@
-param ([Parameter(Mandatory)]$Dockerfile)
+param ([Parameter(Mandatory)]$DockerfilePath)
 
 # Updates the Dockerfile with next ASP.NET Core version and checksum512 hash if available
-function Update-Dockerfile ([string]$path) {
-    Write-Host "Updating $path with next ASP.NET Core version"
+function Update-Dockerfile ([string]$DockerfilePath) {
+    Write-Host "Updating $DockerfilePath with next ASP.NET Core version"
 
-    $nextVersion = Get-NextASPNETVersion -Dockerfile $path
+    $nextVersion = Get-NextASPNETVersion -DockerfilePath $DockerfilePath
 
     $checksumFilePath = "${nextVersion}-checksum.txt"
 
@@ -13,33 +13,33 @@ function Update-Dockerfile ([string]$path) {
 
     Invoke-WebRequest -Uri $checksumUri -OutFile $checksumFilePath
 
-    $arch = Get-Architecture -Dockerfile $path
+    $arch = Get-Architecture -DockerfilePath $DockerfilePath
 
     $artifact = "aspnetcore-runtime-${nextVersion}-linux-${arch}.tar.gz"
-    $checksum = Get-Checksum -Artifact $artifact -Path $checksumFilePath
+    $checksum = Get-Checksum -Artifact $artifact -DockerfilePath $checksumFilePath
 
-    (Get-Content $path) -replace 'ARG ASPNET_VERSION=.*', "ARG ASPNET_VERSION=${nextVersion}" -replace 'ARG ASPNET_SHA512=.*', "ARG ASPNET_SHA512=${checksum}" | Out-File $path
+    (Get-Content $DockerfilePath) -replace 'ARG ASPNET_VERSION=.*', "ARG ASPNET_VERSION=${nextVersion}" -replace 'ARG ASPNET_SHA512=.*', "ARG ASPNET_SHA512=${checksum}" | Out-File $DockerfilePath
 
     Write-Host "Updated ${path} to ${nextVersion}."
 
-    # This allows checksumring the $path variable between steps
+    # This allows checksumring the $DockerfilePath variable between steps
     # which is needed to update the description of the PR
     Write-Host "::set-output name=${path}::- Updated ${path} to ${nextVersion}<br> - Artifact: ${artifact}<br> - Checksum Source: ${checksumUri}"
 }
 
 # Returns Checksum of given ASP.NET Core version from the give Checksum file
-function Get-Checksum ([string]$artifact, [string]$path) {
-    $line = Select-String -Path $path -Pattern $artifact | Select-Object -Property Line -ExpandProperty Line
+function Get-Checksum ([string]$artifact, [string]$DockerfilePath) {
+    $line = Select-String -Path $DockerfilePath -Pattern $artifact | Select-Object -Property Line -ExpandProperty Line
     Write-Host $line
 
     $checksum = $line.Split(" ")[0]
     return $checksum
 }
 
-function Get-Architecture ([string]$Dockerfile) {
-    if ($Dockerfile.Contains("amd64")) {
+function Get-Architecture ([string]$DockerfilePath) {
+    if ($DockerfilePath.Contains("amd64")) {
         return "x64"
-    } elseif ($Dockerfile.Contains("arm64")) {
+    } elseif ($DockerfilePath.Contains("arm64")) {
         return "arm64"
     } else {
         throw "Unsupported architecture"
@@ -47,8 +47,8 @@ function Get-Architecture ([string]$Dockerfile) {
 }
 
 # Returns the next ASP.NET version to be updated in the Dockerfile
-function Get-NextASPNETVersion ([string]$Dockerfile) {
-    $line = Select-String -Path $Dockerfile -Pattern "ARG ASPNET_VERSION=" | Select-Object -Property Line -ExpandProperty Line
+function Get-NextASPNETVersion ([string]$DockerfilePath) {
+    $line = Select-String -Path $DockerfilePath -Pattern "ARG ASPNET_VERSION=" | Select-Object -Property Line -ExpandProperty Line
     $currentVersion = $line.Split("=")[1]
     Write-Host "Current ASPNET version: ${currentVersion}"
 
@@ -69,4 +69,4 @@ function Update-PatchVersion ([string]$version) {
     return $newVersion;
 }
 
-Update-Dockerfile $Dockerfile
+Update-Dockerfile $DockerfilePath
