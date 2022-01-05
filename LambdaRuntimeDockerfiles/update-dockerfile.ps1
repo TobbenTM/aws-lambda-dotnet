@@ -1,3 +1,8 @@
+# This script allows to update Dockerfiles with next ASP.NET Core patch version.
+# It greps the current version from Dockerfile, increment the patch version and fetches checksum file from Microsoft server.
+# If checksum file is available, it will update the Dockerfile next version and its checksum.
+# NOTE: Microsoft only releases patch updates for runtimes, in case of a minor update the Dockerfile a manual update will be required.
+
 param ([Parameter(Mandatory)]$DockerfilePath)
 
 # Updates the Dockerfile with next ASP.NET Core version and checksum512 hash if available
@@ -36,6 +41,7 @@ function Get-Checksum ([string]$artifact, [string]$DockerfilePath) {
     return $checksum
 }
 
+# Returns the architecture of the Dockerfile by checking the path of Dockerfile
 function Get-Architecture ([string]$DockerfilePath) {
     if ($DockerfilePath.Contains("amd64")) {
         return "x64"
