@@ -58,7 +58,7 @@ function Get-NextASPNETVersion ([string]$Dockerfile) {
     return $nextVersion
 }
 
-# Returns the next path version of the given version
+# Returns the next patch version of the given version
 function Update-PatchVersion ([string]$version) {
     $components = $version.Split(".");
     $major = $components[0];
