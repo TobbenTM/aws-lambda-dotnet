@@ -38,8 +38,9 @@ namespace Amazon.Lambda.Tests
 				Assert.False(loggerOptions.IncludeCategory);
 				Assert.False(loggerOptions.IncludeLogLevel);
 				Assert.False(loggerOptions.IncludeNewline);
+                Assert.False(loggerOptions.IncludeState);
 
-				var loggerfactory = new TestLoggerFactory()
+                var loggerfactory = new TestLoggerFactory()
 					.AddLambdaLogger(loggerOptions);
 
 				int count = 0;
@@ -114,8 +115,9 @@ namespace Amazon.Lambda.Tests
 				Assert.False(loggerOptions.IncludeCategory);
 				Assert.False(loggerOptions.IncludeLogLevel);
 				Assert.False(loggerOptions.IncludeNewline);
+                Assert.False(loggerOptions.IncludeState);
 
-				var loggerfactory = new TestLoggerFactory()
+                var loggerfactory = new TestLoggerFactory()
 					.AddLambdaLogger(loggerOptions);
 
 				int count = 0;
@@ -248,7 +250,8 @@ namespace Amazon.Lambda.Tests
 			Assert.True(loggerOptions.IncludeEventId);
 			Assert.True(loggerOptions.IncludeException);
 			Assert.False(loggerOptions.IncludeScopes);
-		}
+            Assert.False(loggerOptions.IncludeState);
+        }
 
 		[Fact]
 		public void TestConfigurationReadingForScopes()
@@ -268,9 +271,31 @@ namespace Amazon.Lambda.Tests
 			Assert.True(loggerOptions.IncludeEventId);
 			Assert.True(loggerOptions.IncludeException);
 			Assert.True(loggerOptions.IncludeScopes);
-		}
+            Assert.False(loggerOptions.IncludeState);
+        }
 
-		[Fact]
+        [Fact]
+        public void TestConfigurationReadingForState()
+        {
+            // Arrange
+            var configuration = new ConfigurationBuilder()
+                    .AddJsonFile(GetAppSettingsPath("appsettings.state.json"))
+                    .Build();
+
+            // Act
+            var loggerOptions = new LambdaLoggerOptions(configuration);
+
+            // Assert
+            Assert.False(loggerOptions.IncludeCategory);
+            Assert.False(loggerOptions.IncludeLogLevel);
+            Assert.False(loggerOptions.IncludeNewline);
+            Assert.False(loggerOptions.IncludeEventId);
+            Assert.False(loggerOptions.IncludeException);
+            Assert.False(loggerOptions.IncludeScopes);
+            Assert.True(loggerOptions.IncludeState);
+        }
+
+        [Fact]
 		public void TestLoggingExceptionsAndEvents()
 		{
 			using (var writer = new StringWriter())
@@ -412,7 +437,91 @@ namespace Amazon.Lambda.Tests
 				Assert.Contains("[Error] Default: In 2nd scope ", text);
 				Assert.Contains("[Information] Default: that's enough ", text);
 			}
-		}
+        }
+
+        [Fact]
+        public void TestLoggingStateEvents()
+        {
+            // Arrange
+            using (var writer = new StringWriter())
+            {
+                ConnectLoggingActionToLogger(message => writer.Write(message));
+
+                var loggerOptions = new LambdaLoggerOptions { IncludeCategory = false, IncludeState = true };
+                var loggerfactory = new TestLoggerFactory()
+                    .AddLambdaLogger(loggerOptions);
+
+                var defaultLogger = loggerfactory.CreateLogger("Default");
+				var expectedNumberValue = new Random().Next();
+
+                // Act
+                defaultLogger.LogInformation("Hello {ExpectedStringKey} {ExpectedNumberKey}", "ExpectedStringValue", expectedNumberValue);
+
+                // Assert
+                // get text and verify
+                var text = writer.ToString();
+                Assert.Contains($"[Information] Hello ExpectedStringValue {expectedNumberValue}", text);
+				Assert.Contains($@"{{""ExpectedStringKey"":""ExpectedStringValue"",""ExpectedNumberKey"":{expectedNumberValue},""{{OriginalFormat}}"":""Hello {{ExpectedStringKey}} {{ExpectedNumberKey}}""}}", text);
+            }
+        }
+
+        [Fact]
+        public void TestLoggingStateEvents_When_ExceptionIsLogged()
+        {
+            // Arrange
+            using (var writer = new StringWriter())
+            {
+                ConnectLoggingActionToLogger(message => writer.Write(message));
+
+                var loggerOptions = new LambdaLoggerOptions { IncludeCategory = false, IncludeState = true };
+                var loggerfactory = new TestLoggerFactory()
+                    .AddLambdaLogger(loggerOptions);
+
+                var defaultLogger = loggerfactory.CreateLogger("Default");
+
+				// Act
+				Exception thrownExeption;
+				try
+				{
+					throw new Exception("ExpectedExceptionMessage");
+				}
+				catch (Exception ex)
+				{
+					thrownExeption = ex;
+					defaultLogger.LogError(ex, "Exception encountered");
+				}
+
+                // Assert
+                // get text and verify
+                var text = writer.ToString();
+                Assert.Contains($"[Error] Exception encountered", text);
+                Assert.Contains($@"{{""{{OriginalFormat}}"":""Exception encountered"",""Exception"":{{""Message"":""ExpectedExceptionMessage"",""Data"":{{}},""InnerException"":null,""HelpLink"":null,""Source"":""Amazon.Lambda.Logging.AspNetCore.Tests"",""HResult"":-2146233088,""StackTrace"":""{thrownExeption.StackTrace.Replace("\\", "\\\\")}""}}}}", text);
+            }
+        }
+
+        [Fact]
+        public void TestLoggingStateEvents_When_NonserializableTypeIsLogged()
+        {
+            // Arrange
+            using (var writer = new StringWriter())
+            {
+                ConnectLoggingActionToLogger(message => writer.Write(message));
+
+                var loggerOptions = new LambdaLoggerOptions { IncludeCategory = false, IncludeState = true };
+                var loggerfactory = new TestLoggerFactory()
+                    .AddLambdaLogger(loggerOptions);
+
+                var defaultLogger = loggerfactory.CreateLogger("Default");
+
+                // Act
+				defaultLogger.LogInformation("Invalid value: {InvalidValue}", IntPtr.Zero);
+
+                // Assert
+                // get text and verify
+                var text = writer.ToString();
+                Assert.Equal($"[Information] Invalid value: 0", text.Trim());
+            }
+        }
 
         [Fact]
         public void TestLoggingWithTypeCategories()

@@ -20,6 +20,7 @@ namespace Microsoft.Extensions.Logging
         private const string INCLUDE_EXCEPTION_KEY = "IncludeException";
 		private const string INCLUDE_EVENT_ID_KEY = "IncludeEventId";
 		private const string INCLUDE_SCOPES_KEY = "IncludeScopes";
+		private const string INCLUDE_STATE_KEY = "IncludeState";
         private const string LOG_LEVEL_KEY = "LogLevel";
         private const string DEFAULT_CATEGORY = "Default";
 
@@ -60,7 +61,14 @@ namespace Microsoft.Extensions.Logging
         /// </summary>
         public bool IncludeScopes { get; set; }
 
-		/// <summary>
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the structured data should be serialized to JSON and included in the message.
+        /// Defaults to <c>false</c>.
+        /// </summary>
+        public bool IncludeState { get; set; }
+
+        /// <summary>
         /// Function used to filter events based on the log level.
         /// Default value is null and will instruct logger to log everything.
         /// </summary>
@@ -78,6 +86,7 @@ namespace Microsoft.Extensions.Logging
             IncludeException = false;
             IncludeEventId = false;
             IncludeScopes = false;
+            IncludeState = false;
             Filter = null;
         }
 
@@ -159,6 +168,11 @@ namespace Microsoft.Extensions.Logging
             if (TryGetString(loggerConfiguration, INCLUDE_SCOPES_KEY, out string includeScopesString))
             {
                 IncludeScopes = bool.Parse(includeScopesString);
+            }
+
+            if (TryGetString(loggerConfiguration, INCLUDE_STATE_KEY, out string includeStateString))
+            {
+                IncludeState = bool.Parse(includeStateString);
             }
         }
 

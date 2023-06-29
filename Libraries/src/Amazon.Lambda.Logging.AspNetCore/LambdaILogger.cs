@@ -1,5 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Amazon.Lambda.Logging.AspNetCore.JsonConverters;
 
 namespace Microsoft.Extensions.Logging
 {
@@ -9,8 +13,16 @@ namespace Microsoft.Extensions.Logging
 		private readonly string _categoryName;
 		private readonly LambdaLoggerOptions _options;
 
+        private static readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions()
+        {
+            Converters =
+			{
+				new JsonStringEnumConverter(),
+				new JsonExceptionConverter(),
+			},
+        };
 
-		internal IExternalScopeProvider ScopeProvider { get; set; }
+        internal IExternalScopeProvider ScopeProvider { get; set; }
 
 		// Constructor
 		public LambdaILogger(string categoryName, LambdaLoggerOptions options)
@@ -68,6 +80,30 @@ namespace Microsoft.Extensions.Logging
 			{
 				components.Add($"{exception}");
 			}
+
+			if (_options.IncludeState && state is IEnumerable<KeyValuePair<string, object>> structuredLogData)
+			{
+				try
+				{
+					var serializableState = structuredLogData
+                        // A lot of Microsoft types are not serializable
+                        .Where(kv => !kv.Value.GetType().Namespace?.StartsWith(nameof(Microsoft)) ?? false)
+						.Concat(new[]
+						{
+							// We always want to add the exception to the serialized state to preserve exception details
+							new KeyValuePair<string, object>(nameof(Exception), exception)
+						})
+						.Where(kv => kv.Value != null)
+                        .ToDictionary(kv => kv.Key, kv => kv.Value);
+					var serializedState = JsonSerializer.Serialize(serializableState, options: _serializerOptions);
+					components.Add(serializedState);
+				}
+				catch
+				{
+					// If state is not serializable, we skip it (could be complex objects coming from consumers, using pointers or other incompatible types)
+				}
+			}
+
 			if (_options.IncludeNewline)
 			{
 				components.Add(Environment.NewLine);
